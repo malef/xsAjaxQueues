@@ -1,0 +1,200 @@
+/**
+ * Extension of jQuery.ajax function for queueing XML HTTP requests
+ *
+ * @author mariusz.alef.bak(at)gmail.com
+ */
+
+body {
+  font-size: 11px;
+  color: #000000;
+  font-family: Helvetica, sans-serif;
+}
+
+#header {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ff4010;
+  font-family: Helvetica, sans-serif;
+  text-align: left;
+  margin-top: 20px;
+  margin-bottom: 0;
+}
+
+#copyright {
+  font-size: 13px;
+  color: #808080;
+  font-family: Helvetica, sans-serif;
+  text-align: left;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+a#code-samples {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 900;
+  color: #505050;
+  text-decoration: none;
+  background-color: #e0e0e0;
+  padding: 4px 6px;
+  -moz-border-radius: 4px;
+}
+
+a#code-samples:hover {
+  color: #ffffff;
+  background-color: #ff4010;
+  cursor: pointer;
+}
+
+.queue-display {
+  display: block;
+  font-family: sans-serif;
+  font-size: 10px;
+  padding: 5px 10px;
+  margin: 0 0 20px 0;
+  -moz-border-radius: 4px;
+  background: #e8e8e8;
+  position: relative;
+}
+
+.queue-toggle,
+.queue-slide {
+  position: absolute;
+  top: 5px;
+  -moz-border-radius: 4px;
+  background: #ffffff;
+  color: #606060;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.queue-toggle {
+  right: 10px;
+}
+
+.queue-slide {
+  right: 70px;
+}
+
+.queue-id,
+.queue-order,
+.queue-priority,
+.queue-mode {
+  display: inline-block;
+  color: #606060;
+  margin: 5px 3em 5px 0;
+}
+
+.queue-counter {
+  display: inline-block;
+  color: #909090;
+  margin: 5px 3em 5px 0;
+}
+
+.queue-id .value,
+.queue-order .value,
+.queue-priority .value,
+.queue-mode .value {
+  font-size: 12px;
+  color: #000000;
+  text-transform: uppercase;
+}
+
+.queue-counter .value {
+  font-size: 12px;
+  color: #404040;
+  text-transform: uppercase;
+}
+
+.queue-details {
+  display: block;
+}
+
+.queue-requests,
+.queue-events {
+  display: block;
+  margin-bottom: 5px 0;
+  padding: 5px 2px;
+  border-top: 1px dotted #a0a0a0;
+  min-height: 60px;
+}
+
+.queue-requests-header,
+.queue-events-header {
+  display: block;
+  font-size: 11px;
+  margin-bottom: 5px;
+  color: #707070;
+}
+
+.queue-event {
+  display: inline-block;
+  padding: 3px 6px;
+  background-color: #d0d0d0;
+  margin: 0 6px 6px 0;
+  -moz-border-radius: 4px;
+}
+
+.request-display { 
+  display: inline-block;
+  width: 190px;
+  font-family: sans-serif;
+  font-size: 10px;
+  padding: 5px 10px;
+  margin: 0 10px 10px 0;
+  -moz-border-radius: 4px;
+  border: 6px solid transparent;
+  position: relative;
+}
+
+.request-sleep,
+.request-priority {
+  display: inline-block;
+  color: #606060;
+  margin: 5px 3em 5px 0;
+}
+
+.request-sleep .value,
+.request-priority .value {
+  color: #000000;
+  text-transform: uppercase;
+}
+
+.request-callbacks,
+.request-flags {
+  display: block;
+  margin: 5px 0 10px 0;
+  text-transform: uppercase;
+}
+
+.request-callback,
+.request-flag {
+  display: inline;
+  background-color: #909090;
+  color: #ffffff;
+  padding: 0.2em 0.5em;
+  margin-right: 0.5em;
+  -moz-border-radius: 4px;
+}
+
+.request-buttons {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.request-button {
+  display: inline-block;
+  width: 0.8em;
+  text-align: center;
+  -moz-border-radius: 4px;
+  background: #f0f0f0;
+  color: #606060;
+  padding: 2px 4px;
+  margin: 0 3px 0 0;
+  text-transform: uppercase;
+  font-size: 9px;
+  cursor: pointer;
+}
