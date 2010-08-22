@@ -17,11 +17,9 @@
 
 (function($) {
 
-  var jQueryAjax, xsAjaxQueues;
+  var xsAjaxQueues = (function($) {
 
-  jQueryAjax = $.ajax;
-
-  xsAjaxQueues = (function() {
+    var jQueryAjax = $.ajax;
 
     /**********************************************************************************************
      * GLOBALS                                                                                    *
@@ -180,6 +178,9 @@
       this.removeListener = function(listener) {
         return queue.removeListener(listener);
       };
+      this.addRequest = function(requestSettings) {
+        return ajax(requestSettings);
+      };
     }
 
     /**********************************************************************************************
@@ -187,6 +188,7 @@
      **********************************************************************************************/
 
     function Request(queue, settings) {
+      var that = this;
       this.id = requestsCount;
       requestsCount = requestsCount + 1;
       this.queue = queue;
@@ -225,6 +227,14 @@
       };
 
       this.listeners = [];
+      if (settings.listeners !== undefined) {
+        $.each(settings.listeners, function(i, listener) {
+          if (typeof(listener) !== 'function') {
+            throw ("Incorrect argument - function expected!");
+          }
+          that.listeners.push(listener);
+        });
+      }
 
       if (this.queue !== undefined) {
         this.initializeQueued();
@@ -924,81 +934,101 @@
       return request.getWrapper();
     }
 
-    function addFilter(callback) {
-      filters.push(callback);
-    }
-
-    function removeFilter(callback) {
-      filters.filter(function(c) {
-        return (c !== callback)
+    function addFilter(filterCondition, preFilter, postFilter) {
+      filters.push({
+        condition: filterCondition,
+        pre: preFilter,
+        post: postFilter
       });
     }
 
-    function applyFilters(requestSettings) {
-      var filteredSettings;
+//    function removeFilter(callback) { // @todo zmienić
+//      filters.filter(function(c) {
+//        return (c !== callback)
+//      });
+//    }
+
+    function getActiveFilters(requestSettings) {
+      var activeFilters = [];
       $.each(filters, function() {
-         filteredSettings = this(requestSettings);
-         if (filteredSettings !== undefined) {
-           return false;
-         }
+        if (this.condition(requestSettings)) {
+          activeFilters.push(this);
+        }
       });
-      if (filteredSettings !== undefined) {
-        return filteredSettings;
+      return activeFilters;
+    }
+
+    function applyPreFilters(activeFilters, requestSettings) {
+      $.each(activeFilters, function() {
+        requestSettings = this.pre(requestSettings);
+      });
+      return requestSettings;
+    }
+
+    function applyPostFilters(activeFilters, requestWrapper) {
+      $.each(activeFilters, function() {
+        this.post(requestWrapper);
+      });
+    }
+
+    function ajax(requestSettings) {
+      var removeWrapper, activeFilters, requestWrapper;
+      if (requestSettings.wrapper !== true) {
+        removeWrapper = true;
+      }
+      activeFilters = getActiveFilters(requestSettings);  // @todo implement and test
+      requestSettings = applyPreFilters(activeFilters, requestSettings);  // @todo implement and test
+      if (requestSettings.queue === undefined) {
+        requestWrapper = newUnqueuedRequest(requestSettings);
+      }
+      else if (typeof(requestSettings.queue) === 'number' || typeof(requestSettings.queue) === 'string' || (typeof(requestSettings.queue) === 'object' && requestSettings.queue !== undefined && typeof(requestSettings.queue.getId) === 'function')) {
+        requestWrapper = newQueuedRequest(requestSettings);
       }
       else {
-        return requestSettings;
+        throw("Incorrect queue parameter - queue id or queue handle object expected!");
+      }
+      applyPostFilters(activeFilters, requestWrapper); // @todo implement and test
+      if (removeWrapper) {
+        return requestWrapper.getXMLHttpRequest();
+        // @todo ta linie nie ma sensu dla zapytań kolejkowanych, bo obiekt XMLHttpRequest
+        // jest tworzony dopiero w chwili wysłania zapytania; dla takich zapytań zwrócona zostanie
+        // wartość undefined;
+        // można zrealizować tę funkcjonalność tylko dla zapytań wysyłanych natychmiast;
+        // również przy przechwytywaniu zapytań i dodawaniu ich do kolejek należy być
+        // pewnym, że zewnętrzny kod nie pobiera obiektu XMLHttpRequest;
+      }
+      else {
+        return requestWrapper;
       }
     }
 
+    function ajaxQueue() {
+      if (typeof(arguments[0]) === 'object') {
+        return newQueue(arguments[0]);
+      }
+      else if (typeof(arguments[0]) === 'number' || typeof(arguments[0]) === 'string') {
+        return getQueue(arguments[0]);
+      }
+      else if ((typeof(arguments[0]) === 'function' || arguments[0] === true) && (typeof(arguments[1]) === 'function' || typeof(arguments[2]) === 'function')) {
+        addFilter(arguments[0], arguments[1], arguments[2]);
+      }
+      else {
+        throw("Incorrect arguments - queue settings, queue id or filter functions exected!")
+      }
+    }
 
     /**********************************************************************************************
      * INTERFACE                                                                                  *
      **********************************************************************************************/
 
     return {
-      newQueue: newQueue,
-      getQueue: getQueue,
-      newQueuedRequest: newQueuedRequest,
-      newUnqueuedRequest: newUnqueuedRequest,
-      addFilter: addFilter,
-      applyFilters: applyFilters
+      ajax: ajax,
+      ajaxQueue: ajaxQueue
     };
 
   }(jQuery));
 
-  $.ajax = function(requestSettings) {
-    var requestWrapper;
-    requestSettings = xsAjaxQueues.applyFilters(requestSettings);
-    if (requestSettings.queue === undefined) {
-      requestWrapper = xsAjaxQueues.newUnqueuedRequest(requestSettings);
-    }
-    else if (typeof(requestSettings.queue) === 'number' || typeof(requestSettings.queue) === 'string' || (typeof(requestSettings.queue) === 'object' && requestSettings.queue !== undefined && typeof(requestSettings.queue.getId) === 'function')) {
-      requestWrapper = xsAjaxQueues.newQueuedRequest(requestSettings);
-    }
-    else {
-      throw("Incorrect queue parameter - id or queueWrapper object expected!");
-    }
-    if (requestSettings.wrapper) {
-      return requestWrapper;
-    }
-    else {
-      return requestWrapper.getXMLHttpRequest();
-    }
-  };
-
-  $.ajaxQueue = function() {
-    switch (typeof(arguments[0])) {
-      case 'object':
-        return xsAjaxQueues.newQueue(arguments[0]);
-        break;
-      case 'number':
-      case 'string':
-        return xsAjaxQueues.getQueue(arguments[0]);
-        break;
-      case 'function':
-        xsAjaxQueues.addFilter(arguments[0]);
-        break;
-    }
-  };
+  $.ajax = xsAjaxQueues.ajax;
+  $.ajaxQueue = xsAjaxQueues.ajaxQueue;
 
 }(jQuery));

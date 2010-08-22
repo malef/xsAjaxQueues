@@ -309,25 +309,58 @@ jQuery((function($) {
 
     $.each(requests, function() {
       this.wrapper = true;
-      xsAjaxQueuesDemo.addRequest($.ajax(this));
-    });
-
-    $.ajaxQueue({id: 'intercepted_requests', priority: 'desc', mode: 'request'}).disable();
-
-    $.ajaxQueue(function(settings) {
-      if (settings.queue === undefined) {
-        settings.queue = 'intercepted_requests';
-        if (settings.data.sleep > 4) {
-          settings.priority = 0;
-        }
-        else {
-          settings.priority = 1;
-        }
-        return settings;
+      if (this.queue !== 'fifo_priority_response') {
+        xsAjaxQueuesDemo.addRequest($.ajax(this));
+      }
+      else {
+        var queueWrapper = $.ajaxQueue('fifo_priority_response');
+        xsAjaxQueuesDemo.addRequest(queueWrapper.addRequest(this));
       }
     });
 
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}});
+    $.ajaxQueue({id: 'intercepted_requests', priority: 'desc', mode: 'request'}); //.disable();
+
+//    $.ajaxQueue(function(requestSettings) {
+//      return (requestSettings.queue === undefined);
+//    }, function(requestSettings) {
+//      requestSettings.queue = 'intercepted_requests';
+//      if (requestSettings.data.sleep > 4) {
+//        requestSettings.priority = 0;
+//      }
+//      else {
+//        requestSettings.priority = 1;
+//      }
+//      return requestSettings;
+//    },
+//    function(requestWrapper) {
+//      requestWrapper.addListener(function(event) {
+//        $('body').append($('<p />').text('post ' + event + ' ' + this.getId()));
+//      });
+//    });
+
+    $.ajaxQueue(function(requestSettings) {
+      return (requestSettings.queue === undefined);
+    }, function(requestSettings) {
+      requestSettings.queue = 'intercepted_requests';
+      if (requestSettings.data.sleep > 4) {
+        requestSettings.priority = 0;
+      }
+      else {
+        requestSettings.priority = 1;
+      }
+      return requestSettings;
+    },
+    function(requestWrapper) {
+      requestWrapper.addListener(function(event) {
+        $('body').append($('<p />').text('post ' + event + ' ' + this.getId()));
+      });
+    });
+
+    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}, listeners: [
+      function(event) {
+        $('body').append($('<p />').append($('<b />').text(event)));
+      }
+    ]});
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 6}});
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}});
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 2}});
