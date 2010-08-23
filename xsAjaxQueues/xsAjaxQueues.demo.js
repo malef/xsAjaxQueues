@@ -29,13 +29,13 @@ jQuery((function($) {
        * REQUEST DISPLAY                                                                            *
        **********************************************************************************************/
 
-      function QueueDisplay(queueWrapper, container) {
+      function QueueDisplay(queueHandle, container) {
         var that = this, markup, queueSettings;
 
-        queueDisplays[queueWrapper.getId()] = this;
-        this.queueWrapper = queueWrapper;
-        this.queueWrapper.disable();
-        this.queueWrapper.addListener(function() {
+        queueDisplays[queueHandle.getId()] = this;
+        this.queueHandle = queueHandle;
+        this.queueHandle.disable();
+        this.queueHandle.addListener(function() {
           that.update();
         });
         this.container = $(container);
@@ -76,8 +76,8 @@ jQuery((function($) {
           that.elements.counters[name] = $('.queue-counter', markup).eq(i);
         });
 
-        queueSettings = this.queueWrapper.getSettings();
-        $('.value', this.elements.id).text(this.queueWrapper.getId());
+        queueSettings = this.queueHandle.getSettings();
+        $('.value', this.elements.id).text(this.queueHandle.getId());
         $('.value', this.elements.mode).html(queueSettings.order.mode ? queueSettings.order.mode : 'request');
         $('.value', this.elements.order).html(queueSettings.order ? queueSettings.order.order : 'fifo');
         $('.value', this.elements.priority).html(queueSettings.order.priority ? queueSettings.order.priority : '~');
@@ -92,8 +92,8 @@ jQuery((function($) {
         this.elements.details.hide();
 
         this.elements.toggle.click(function() {
-          that.queueWrapper.toggle();
-          if (that.queueWrapper.isEnabled()) {
+          that.queueHandle.toggle();
+          if (that.queueHandle.isEnabled()) {
             that.elements.toggle.text('disable');
           }
           else
@@ -109,7 +109,7 @@ jQuery((function($) {
 
       QueueDisplay.prototype.update = function() {
         var that = this, counters;
-        counters = this.queueWrapper.getCounters();
+        counters = this.queueHandle.getCounters();
         $.each(['added', 'sent', 'received', 'processed', 'canceled', 'aborted'], function(i, name) {
           $('.value', that.elements.counters[name]).html(counters[name]);
         });
@@ -119,12 +119,12 @@ jQuery((function($) {
        * REQUEST DISPLAY                                                                            *
        **********************************************************************************************/
 
-      function RequestDisplay(requestWrapper) {
+      function RequestDisplay(requestHandle) {
 
         var that = this, markup, requestSettings;
 
-        this.requestWrapper = requestWrapper;
-        this.queueDisplay = getQueueDisplay(requestWrapper.getQueueId());
+        this.requestHandle = requestHandle;
+        this.queueDisplay = getQueueDisplay(requestHandle.getQueueId());
         this.container = this.queueDisplay.elements.requests;
 
         markup = $(
@@ -166,30 +166,30 @@ jQuery((function($) {
           that.elements.buttons[name] = $('.request-button', markup).eq(i);
         });
 
-        requestSettings = this.requestWrapper.getSettings();
+        requestSettings = this.requestHandle.getSettings();
         $('.value', this.elements.priority).text(requestSettings.priority ? requestSettings.priority : '~');
         $('.value', this.elements.sleep).text(requestSettings.data.sleep ? requestSettings.data.sleep : '~');
         this.setPriorityColor(requestSettings.priority ? requestSettings.priority : 0);
 
         // button events
         this.elements.buttons.cancel.click(function() {
-          that.requestWrapper.cancel();
+          that.requestHandle.cancel();
         });
         this.elements.buttons.abort.click(function() {
-          that.requestWrapper.cancel(true);
+          that.requestHandle.cancel(true);
         });
         this.elements.buttons.inspect.click(function() {
           var inspect = {};
           $.each(['success', 'error', 'complete'], function(i, callback) {
             inspect[callback] = {
-              context: requestWrapper.getCallbackContext(callback),
-              args: requestWrapper.getCallbackArgs(callback)
+              context: requestHandle.getCallbackContext(callback),
+              args: requestHandle.getCallbackArgs(callback)
             };
           });
           debugger; // intentional
         });
 
-        this.requestWrapper.addListener(function(event) {
+        this.requestHandle.addListener(function(event) {
           switch (event) {
             case 'sent':
             case 'canceled':
@@ -237,12 +237,12 @@ jQuery((function($) {
        * INTERFACE                                                                                  *
        **********************************************************************************************/
 
-      function addQueue(queueWrapper) {
-        var queueDisplay = new QueueDisplay(queueWrapper, '#demo-container');
+      function addQueue(queueHandle) {
+        var queueDisplay = new QueueDisplay(queueHandle, '#demo-container');
       }
 
-      function addRequest(requestWrapper) {
-        var requestDisplay = new RequestDisplay(requestWrapper);
+      function addRequest(requestHandle) {
+        var requestDisplay = new RequestDisplay(requestHandle);
       }
 
       return {
@@ -308,59 +308,44 @@ jQuery((function($) {
     ];
 
     $.each(requests, function() {
-      this.wrapper = true;
+      this.handle = true;
       if (this.queue !== 'fifo_priority_response') {
+        // sending requests with $.ajax
         xsAjaxQueuesDemo.addRequest($.ajax(this));
       }
       else {
-        var queueWrapper = $.ajaxQueue('fifo_priority_response');
-        xsAjaxQueuesDemo.addRequest(queueWrapper.addRequest(this));
+        // sending requests with queue handle addRequest method
+        var queueHandle = $.ajaxQueue('fifo_priority_response');
+        xsAjaxQueuesDemo.addRequest(queueHandle.addRequest(this));
       }
     });
 
-    $.ajaxQueue({id: 'intercepted_requests', priority: 'desc', mode: 'request'}); //.disable();
+    $.ajaxQueue({id: 'intercepted_requests', priority: 'desc', mode: 'request', initializer: function() { alert(this.getId()); } }); //.disable();
 
-//    $.ajaxQueue(function(requestSettings) {
-//      return (requestSettings.queue === undefined);
-//    }, function(requestSettings) {
-//      requestSettings.queue = 'intercepted_requests';
-//      if (requestSettings.data.sleep > 4) {
-//        requestSettings.priority = 0;
-//      }
-//      else {
-//        requestSettings.priority = 1;
-//      }
-//      return requestSettings;
-//    },
-//    function(requestWrapper) {
-//      requestWrapper.addListener(function(event) {
-//        $('body').append($('<p />').text('post ' + event + ' ' + this.getId()));
-//      });
-//    });
-
-    $.ajaxQueue(function(requestSettings) {
-      return (requestSettings.queue === undefined);
-    }, function(requestSettings) {
-      requestSettings.queue = 'intercepted_requests';
-      if (requestSettings.data.sleep > 4) {
-        requestSettings.priority = 0;
+    $.ajaxFilter(function() {
+      return (this.queue === undefined);
+    }, function() {
+      this.queue = 'intercepted_requests';
+      if (this.data || this.data.sleep || this.data.sleep > 4) {
+        this.priority = 0;
       }
       else {
-        requestSettings.priority = 1;
+        this.priority = 1;
       }
-      return requestSettings;
+      return this;
     },
-    function(requestWrapper) {
-      requestWrapper.addListener(function(event) {
+    function() {
+      this.addListener(function(event) {
         $('body').append($('<p />').text('post ' + event + ' ' + this.getId()));
       });
     });
 
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}, listeners: [
       function(event) {
-        $('body').append($('<p />').append($('<b />').text(event)));
+        $('body').append($('<p />').append($('<em />').text(event)));
       }
     ]});
+
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 6}});
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}});
     $.ajax({type: "POST", url: "sleep.php", data: {sleep: 2}});

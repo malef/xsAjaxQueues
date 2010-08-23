@@ -1,40 +1,45 @@
 /**
  * xsAjaxQueues
+ * 
  * Extension of jQuery.ajax function for queueing XMLHttpRequests
  *
  * @author mariusz.bak(at)xsolve.pl
  *         mariusz.alef.bak(at)gmail.com
  *
- * @revision 2010-08-19 20:10
+ * @revision 2010-08-23 20:45
  */
 
 /**
- * dodać możliwość dołączania funkcji nasłuchujących poprzez przekazanie ich w opcjach zapytania/kolejki
- * dodać możliwość przekazywania funkcji inicjalizujących zapytania/kolejki
+ * - improve argument checking and exception messages;
+ *   use exception rethrowing in interface functions;
+ * - test listeners and initializer properties;
+ * - test filters;
+ * - add Queue.remove and QueueHandle.remove methods;
+ * - update code examples and simplify demo;
+ * - update monitor by using filters;
+ * - prepare documentation;
  */
 
 "use strict";
 
 (function($) {
 
-  var xsAjaxQueues = (function($) {
-
-    var jQueryAjax = $.ajax;
+  var xsAjaxQueues = (function() {
 
     /**********************************************************************************************
      * GLOBALS                                                                                    *
      **********************************************************************************************/
 
-    var requestsCount = 0, queues = {}, filters = [];
+    var jQueryAjax = $.ajax, requestsCount = 0, queues = {}, filters = [], Queue;
 
     /**********************************************************************************************
-     * WRAPPERS                                                                                   *
+     * HANDLES                                                                                    *
      **********************************************************************************************/
 
     /**
-     * Request wrapper constructor
+     * Request handle constructor
      */
-    function RequestWrapper(request) {
+    function RequestHandle(request) {
       this.getId = function() {
         return request.id;
       };
@@ -44,7 +49,7 @@
 
       this.getQueue = function() {
         if (request.queue !== undefined) {
-          return request.queue.getWrapper();
+          return request.queue.getHandle();
         }
         else {
           return undefined;
@@ -128,7 +133,7 @@
       };
     }
 
-    function QueueWrapper(queue) {
+    function QueueHandle(queue) {
       this.getId = function() {
         return queue.settings.id;
       };
@@ -158,13 +163,13 @@
         return this;
       };
       this.getRequests = function() {
-        var requests, requestWrappers;
+        var requests, requestHandles;
         requests = queue.getRequests();
-        requestWrappers = [];
+        requestHandles = [];
         $.each(requests, function(i, r) {
-          requestWrappers.push(r.getWrapper());
+          requestHandles.push(r.getHandle());
         });
-        return requestWrappers;
+        return requestHandles;
       };
       this.getCounters = function() {
         var counters = queue.counters;
@@ -179,7 +184,30 @@
         return queue.removeListener(listener);
       };
       this.addRequest = function(requestSettings) {
-        return ajax(requestSettings);
+        return xsAjaxQueues.ajax(requestSettings);
+      };
+    }
+
+    function FilterHandle(filter) {
+      var that = this;
+      this.enable = function() {
+        filter.enable();
+        return this;
+      };
+      this.disable = function() {
+        filter.disable();
+        return this;
+      };
+      this.toggle = function() {
+        filter.toggle();
+        return this;
+      };
+      this.remove = function() {
+        filter.remove();
+        delete this.enable;
+        delete this.disable;
+        delete this.toggle;
+        delete this.remove;
       };
     }
 
@@ -187,12 +215,12 @@
      * REQUESTS                                                                                   *
      **********************************************************************************************/
 
-    function Request(queue, settings) {
+    function Request(queue, requestSettings) {
       var that = this;
       this.id = requestsCount;
       requestsCount = requestsCount + 1;
       this.queue = queue;
-      this.settings = settings;
+      this.settings = requestSettings;
       this.flags = {
         sent: false,
         received: false,
@@ -211,9 +239,9 @@
         };
       }
       this.callbacks = {
-        success: settings.success,
-        error: settings.error,
-        complete: settings.complete
+        success: requestSettings.success,
+        error: requestSettings.error,
+        complete: requestSettings.complete
       };
       this.contexts = {
         success: undefined,
@@ -225,24 +253,30 @@
         error: undefined,
         complete: undefined
       };
-
       this.listeners = [];
-      if (settings.listeners !== undefined) {
-        $.each(settings.listeners, function(i, listener) {
+      if (requestSettings.listeners !== undefined) {
+        if (!$.isArray(requestSettings.listeners)) {
+          requestSettings.listeners = [requestSettings.listeners];
+        }
+        $.each(requestSettings.listeners, function(i, listener) {
           if (typeof(listener) !== 'function') {
             throw ("Incorrect argument - function expected!");
           }
           that.listeners.push(listener);
         });
       }
-
       if (this.queue !== undefined) {
         this.initializeQueued();
       }
       else {
-        if (this.settings.wrapper) {
+        if (this.settings.handle) {
           this.initializeUnqueued();
         }
+      }
+      if (requestSettings.initializer !== undefined) {
+        requestSettings.initializer.apply(this.getHandle());
+      }
+      if (this.queue === undefined) {
         this.send();
       }
     }
@@ -414,14 +448,14 @@
     };
 
     /**
-     * Get request wrapper
+     * Get request handle
      *
-     * Returns wrapper object with interface to public methods and various getters and setters.
+     * Returns handle object with interface to public methods and various getters and setters.
      *
-     * @return RequestWrapper
+     * @return RequestHandle
      */
-    Request.prototype.getWrapper = function() {
-      return new RequestWrapper(this);
+    Request.prototype.getHandle = function() {
+      return new RequestHandle(this);
     };
 
     Request.prototype.addListener = function(listener) {
@@ -456,7 +490,7 @@
       }
       data = arguments;
       $.each(this.listeners, function () {
-        this.apply(that.getWrapper(), data);
+        this.apply(that.getHandle(), data);
       });
       return this;
     };
@@ -468,38 +502,57 @@
     /**
      * @todo Improve settings checking and default settings fallback
      */
-    function Queue(settings) {
-      var defaultSettings;
-      if (queues[settings.id] !== undefined) {
-        throw("Queue '" + settings.id + "' already exists!");
-      }
-      queues[settings.id] = this;
-      defaultSettings = {
+    Queue = (function() {
+
+      var defaultQueueSettings = {
         order: 'fifo',
         mode: 'request'
       };
-      this.settings = $.extend({}, defaultSettings, settings);
-      this.locked = false;
-      this.enabled = true;
-      this.requests = [];
-      this.counters = {
-        added: 0,
-        sent: 0,
-        received: 0,
-        processed: 0,
-        canceled: 0,
-        aborted: 0,
-        callbacks: {
-          success: 0,
-          error: 0,
-          complete: 0
+
+      return function (queueSettings) {
+        var that = this;
+        if (queues[queueSettings.id] !== undefined) {
+          throw("Queue '" + queueSettings.id + "' already exists!");
+        }
+        queues[queueSettings.id] = this;
+        this.settings = $.extend({}, defaultQueueSettings, queueSettings);
+        this.locked = false;
+        this.enabled = true;
+        this.requests = [];
+        this.counters = {
+          added: 0,
+          sent: 0,
+          received: 0,
+          processed: 0,
+          canceled: 0,
+          aborted: 0,
+          callbacks: {
+            success: 0,
+            error: 0,
+            complete: 0
+          }
+        };
+        this.listeners = [];
+        if (queueSettings.listeners !== undefined) {
+          if (!$.isArray(queueSettings.listeners)) {
+            queueSettings.listeners = [queueSettings.listeners];
+          }
+          $.each(queueSettings.listeners, function(i, listener) {
+            if (typeof(listener) !== 'function') {
+              throw ("Incorrect argument - function expected!");
+            }
+            that.listeners.push(listener);
+          });
+        }
+        if (queueSettings.initializer !== undefined) {
+          queueSettings.initializer.apply(this.getHandle());
         }
       };
-      this.listeners = [];
-    }
 
-    Queue.prototype.getWrapper = function() {
-      return new QueueWrapper(this);
+    }());
+
+    Queue.prototype.getHandle = function() {
+      return new QueueHandle(this);
     };
 
     /**
@@ -521,7 +574,7 @@
       }
       this.counters.added = this.counters.added + 1;
       request.dispatchEvent('added'); // @todo enable attaching event listeners by passing option in request settings to enable to catch this event
-      this.dispatchEvent('added', request.getWrapper());
+      this.dispatchEvent('added', request.getHandle());
       this.sendRequest();
       return request;
     };
@@ -541,7 +594,7 @@
     /**
      * Delete request from queue
      *
-     * Removes passed request object from queue. All request wrappers remain connected
+     * Removes passed request object from queue. All request handles remain connected
      * with original request object.
      * 
      * @param deletedRequest Request
@@ -631,17 +684,17 @@
                   if (!request.flags.aborted) {
                     if (!request.flags.received) {
                       request.setFlag('received');
-                      that.dispatchEvent('received', request.getWrapper());
+                      that.dispatchEvent('received', request.getHandle());
                     }
                     request.executeCallback(name, this, arguments);
-                    that.dispatchEvent(name, request.getWrapper());
+                    that.dispatchEvent(name, request.getHandle());
                     that.counters.callbacks[name] = that.counters.callbacks[name] + 1;
                     if (name === 'complete') {
                       that.deleteRequest(request);
                       that.counters.received = that.counters.received + 1;
                       that.counters.processed = that.counters.processed + 1;
                       that.locked = false;
-                      that.dispatchEvent('processed', request.getWrapper());
+                      that.dispatchEvent('processed', request.getHandle());
                       nextRequest = that.getNextRequest(function(request) {
                         return !request.flags.sent && !request.flags.canceled;
                       });
@@ -658,7 +711,7 @@
               request.send();
               this.counters.sent = this.counters.sent + 1;
               this.locked = true;
-              this.dispatchEvent('sent', request.getWrapper());
+              this.dispatchEvent('sent', request.getHandle());
               nextRequest = this.getNextRequest(function(request) {
                 return !request.flags.sent && !request.flags.canceled;
               });
@@ -677,7 +730,7 @@
                     if (name === 'complete') {
                       request.setFlag('received');
                       that.counters.received = that.counters.received + 1;
-                      that.dispatchEvent('received', request.getWrapper());
+                      that.dispatchEvent('received', request.getHandle());
                       that.processRequest();
                     }
                   };
@@ -685,7 +738,7 @@
               });
               request.send();
               this.counters.sent = this.counters.sent + 1;
-              this.dispatchEvent('sent', request.getWrapper());
+              this.dispatchEvent('sent', request.getHandle());
               nextRequest = this.getNextRequest(function(request) {
                 return !request.flags.sent && !request.flags.canceled;
               });
@@ -727,7 +780,7 @@
           this.counters.processed = this.counters.processed + 1;
           this.deleteRequest(request);
           request.setFlag('processed');
-          this.dispatchEvent('processed', request.getWrapper());
+          this.dispatchEvent('processed', request.getHandle());
           this.processRequest();
         }
         else {
@@ -755,19 +808,19 @@
         if (!request.flags.sent) {
           this.deleteRequest(request);
           this.counters.canceled = this.counters.canceled + 1;
-          this.dispatchEvent('canceled', request.getWrapper());
+          this.dispatchEvent('canceled', request.getHandle());
         }
         else if (abort && request.flags.sent && !request.flags.processed) {
           switch (this.settings.mode) {
             case 'request':
               this.counters.aborted = this.counters.aborted + 1;
               this.locked = false;
-              this.dispatchEvent('aborted', request.getWrapper());
+              this.dispatchEvent('aborted', request.getHandle());
               this.sendRequest();
               break;
             case 'response':
               this.counters.aborted = this.counters.aborted + 1;
-              this.dispatchEvent('aborted', request.getWrapper());
+              this.dispatchEvent('aborted', request.getHandle());
               this.processRequest();
               break;
           }
@@ -882,6 +935,92 @@
     };
 
     /**********************************************************************************************
+     * FILTERS                                                                                    *
+     **********************************************************************************************/
+
+    function Filter(filterCondition, preFilter, postFilter) {
+      if (filterCondition !== true && typeof(filterCondition) !== 'function') {
+        throw('Incorrect argument - true or function expected!');
+      }
+      if (preFilter !== undefined && typeof(preFilter) !== 'function') {
+        throw('Incorrect argument - function or undefined expected!');
+      }
+      if (postFilter !== undefined && typeof(postFilter) !== 'function') {
+        throw('Incorrect argument - function or undefined expected!');
+      }
+      if (preFilter === undefined && postFilter === undefined) {
+        throw('Incorrect argument - function or undefined expected!');
+      }
+      if (filterCondition !== true) {
+        this.filterCondition = filterCondition;
+      }
+      if (preFilter !== undefined) {
+        this.preFilter = preFilter;
+      }
+      if (postFilter !== undefined) {
+        this.postFilter = postFilter;
+      }
+      this.enabled = true;
+    }
+
+    Filter.prototype.enable = function() {
+      this.enabled = true;
+      return this;
+    };
+
+    Filter.prototype.disable = function() {
+      this.enabled = false;
+      return this;
+    };
+
+    Filter.prototype.toggle = function() {
+      if (this.enabled) {
+        this.disable();
+      }
+      else {
+        this.enable();
+      }
+      return this;
+    };
+
+    Filter.prototype.testFilterCondition = function(requestSettings) {
+      if (this.filterCondition !== undefined) {
+        return this.filterCondition.apply(requestSettings);
+      }
+      else {
+        return true;
+      }
+    };
+
+    Filter.prototype.applyPreFilter = function(requestSettings) {
+      if (this.preFilter !== undefined) {
+        return this.preFilter.apply(requestSettings);
+      }
+      else {
+        return requestSettings;
+      }
+    };
+
+    Filter.prototype.applyPostFilter = function(requestHandle) {
+      if (this.postFilter !== undefined) {
+        this.postFilter.apply(requestHandle);
+      }
+    };
+
+    Filter.prototype.remove = function() {
+      filters.filter(function(filter) {
+        return (filter !== this);
+      });
+    };
+
+    Filter.prototype.getHandle = function() {
+      if (this.handle === undefined) {
+        this.handle = new FilterHandle(this);
+      }
+      return this.handle;
+    };
+
+    /**********************************************************************************************
      * MAIN FUNCTIONS                                                                             *
      **********************************************************************************************/
 
@@ -895,7 +1034,7 @@
       }
       queue = new Queue(queueSettings);
       queues[queueSettings.id] = queue;
-      return queue.getWrapper();
+      return queue.getHandle();
     }
 
     function getQueue(queueId) {
@@ -905,18 +1044,18 @@
       if (queues[queueId] === undefined) {
         throw("Queue " + queueId + " does not exist!");
       }
-      return queues[queueId].getWrapper();
+      return queues[queueId].getHandle();
     }
 
     function newUnqueuedRequest(requestSettings) {
       var request = new Request(undefined, requestSettings);
-      return request.getWrapper();
+      return request.getHandle();
     }
 
     function newQueuedRequest(requestSettings) {
       var queueId, queue, request;
       if (typeof(requestSettings.queue) === 'object' && requestSettings.queue !== undefined && typeof(requestSettings.queue.getId) === 'function') {
-        // queueWrapper object passed
+        // queueHandle object passed
         queueId = requestSettings.queue.getId();
       }
       else {
@@ -931,65 +1070,53 @@
       }
       queue = queues[queueId];
       request = queue.addRequest(requestSettings);
-      return request.getWrapper();
+      return request.getHandle();
     }
 
-    function addFilter(filterCondition, preFilter, postFilter) {
-      filters.push({
-        condition: filterCondition,
-        pre: preFilter,
-        post: postFilter
-      });
+    function newFilter(filterCondition, preFilter, postFilter) {
+      var filter;
+      filter = new Filter(filterCondition, preFilter, postFilter);
+      filters.push(filter);
+      return filter.getHandle();
     }
-
-//    function removeFilter(callback) { // @todo zmienić
-//      filters.filter(function(c) {
-//        return (c !== callback)
-//      });
-//    }
 
     function getActiveFilters(requestSettings) {
       var activeFilters = [];
       $.each(filters, function() {
-        if (this.condition(requestSettings)) {
+        if (this.testFilterCondition(requestSettings)) {
           activeFilters.push(this);
         }
       });
       return activeFilters;
     }
 
-    function applyPreFilters(activeFilters, requestSettings) {
-      $.each(activeFilters, function() {
-        requestSettings = this.pre(requestSettings);
-      });
-      return requestSettings;
-    }
-
-    function applyPostFilters(activeFilters, requestWrapper) {
-      $.each(activeFilters, function() {
-        this.post(requestWrapper);
-      });
-    }
-
+    /**********************************************************************************************
+     * INTERFACE                                                                                  *
+     **********************************************************************************************/
+    
     function ajax(requestSettings) {
-      var removeWrapper, activeFilters, requestWrapper;
-      if (requestSettings.wrapper !== true) {
-        removeWrapper = true;
+      var removeHandle, activeFilters, requestHandle;
+      if (requestSettings.handle !== true) {
+        removeHandle = true;
       }
-      activeFilters = getActiveFilters(requestSettings);  // @todo implement and test
-      requestSettings = applyPreFilters(activeFilters, requestSettings);  // @todo implement and test
+      activeFilters = getActiveFilters(requestSettings);
+      $.each(activeFilters, function() {
+        requestSettings = this.applyPreFilter(requestSettings);
+      });
       if (requestSettings.queue === undefined) {
-        requestWrapper = newUnqueuedRequest(requestSettings);
+        requestHandle = newUnqueuedRequest(requestSettings);
       }
       else if (typeof(requestSettings.queue) === 'number' || typeof(requestSettings.queue) === 'string' || (typeof(requestSettings.queue) === 'object' && requestSettings.queue !== undefined && typeof(requestSettings.queue.getId) === 'function')) {
-        requestWrapper = newQueuedRequest(requestSettings);
+        requestHandle = newQueuedRequest(requestSettings);
       }
       else {
         throw("Incorrect queue parameter - queue id or queue handle object expected!");
       }
-      applyPostFilters(activeFilters, requestWrapper); // @todo implement and test
-      if (removeWrapper) {
-        return requestWrapper.getXMLHttpRequest();
+      $.each(activeFilters, function() {
+        this.applyPostFilter(requestHandle);
+      });
+      if (removeHandle) {
+        return requestHandle.getXMLHttpRequest();
         // @todo ta linie nie ma sensu dla zapytań kolejkowanych, bo obiekt XMLHttpRequest
         // jest tworzony dopiero w chwili wysłania zapytania; dla takich zapytań zwrócona zostanie
         // wartość undefined;
@@ -998,7 +1125,7 @@
         // pewnym, że zewnętrzny kod nie pobiera obiektu XMLHttpRequest;
       }
       else {
-        return requestWrapper;
+        return requestHandle;
       }
     }
 
@@ -1009,26 +1136,38 @@
       else if (typeof(arguments[0]) === 'number' || typeof(arguments[0]) === 'string') {
         return getQueue(arguments[0]);
       }
-      else if ((typeof(arguments[0]) === 'function' || arguments[0] === true) && (typeof(arguments[1]) === 'function' || typeof(arguments[2]) === 'function')) {
-        addFilter(arguments[0], arguments[1], arguments[2]);
-      }
       else {
-        throw("Incorrect arguments - queue settings, queue id or filter functions exected!")
+        throw("Incorrect arguments - queue settings, queue id or filter functions exected!");
       }
     }
 
-    /**********************************************************************************************
-     * INTERFACE                                                                                  *
-     **********************************************************************************************/
+    function ajaxFilter() {
+      if (arguments[0] !== true && typeof(arguments[0]) !== 'function') {
+        throw('Incorrect argument - true or function expected!');
+      }
+      if (arguments[1] !== undefined && typeof(arguments[1]) !== 'function') {
+        throw('Incorrect argument - function or undefined expected!');
+      }
+      if (arguments[2] !== undefined && typeof(arguments[2]) !== 'function') {
+        throw('Incorrect argument - function or undefined expected!');
+      }
+      if (arguments[1] === undefined && arguments[2] === undefined) {
+        throw('Incorrect argument - function or undefined expected!');
+      }
+      return newFilter(arguments[0], arguments[1], arguments[2]);
+    }
 
     return {
       ajax: ajax,
-      ajaxQueue: ajaxQueue
+      ajaxQueue: ajaxQueue,
+      ajaxFilter: ajaxFilter
     };
 
-  }(jQuery));
+  }());
 
+  // replacing jQuery.ajax and adding jQuery.ajaxQueue and jQuery.ajaxFilter
   $.ajax = xsAjaxQueues.ajax;
   $.ajaxQueue = xsAjaxQueues.ajaxQueue;
+  $.ajaxFilter = xsAjaxQueues.ajaxFilter;
 
 }(jQuery));
