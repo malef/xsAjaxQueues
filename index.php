@@ -32,7 +32,7 @@
     <div id="demo-container"></div>
     <div>
       <a id="code-samples" href="xsAjaxQueues/xsAjaxQueues.samples.js" target="_blank">Browse code samples</a>
-      <a id="slideshow" href="slideshow/xsAjaxQueus.pdf" target="_blank">View slideshow</a>
+      <a id="slideshow" href="slideshow/xsAjaxQueues.pdf" target="_blank">View slideshow</a>
       <a id="github" href="https://github.com/mariusz-alef-bak/xsAjaxQueues" target="_blank">Fork on GitHub</a>
     </div>
   </body>
