@@ -7,40 +7,67 @@
 body {
   font-size: 11px;
   color: #000000;
-  font-family: Helvetica, sans-serif;
+  font-family: Ubuntu, Helvetica, Arial, sans-serif;
+  background-color: #d0d0f0;
 }
 
 #header {
   font-size: 18px;
   font-weight: 900;
-  color: #ff4010;
-  font-family: Helvetica, sans-serif;
+  font-family: inherit;
   text-align: left;
-  margin-top: 20px;
-  margin-bottom: 0;
+  margin-top: 22px;
+  margin-bottom: 5px;
 }
 
 #copyright {
   font-size: 13px;
-  color: #808080;
-  font-family: Helvetica, sans-serif;
+  color: #404040;
+  font-family: inherit;
   text-align: left;
   margin-top: 0;
-  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #a0a0a0;
+  margin-bottom: 10px;
 }
 
-a#code-samples {
+#copyright a {
+  text-decoration: none;
+  color: black;
+}
+
+#copyright a:hover {
+  text-decoration: underline;
+}
+
+#description {
+  font-size: 12px;
+  font-family: inherit;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #a0a0a0;
+  margin-bottom: 30px;
+}
+
+#description p {
+  margin: 0 0 1em 0;
+}
+
+a#code-samples,
+a#slideshow,
+a#github {
   display: inline-block;
   font-size: 12px;
   font-weight: 900;
-  color: #505050;
+  background-color: #505050;
   text-decoration: none;
-  background-color: #e0e0e0;
-  padding: 4px 6px;
-  -moz-border-radius: 4px;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  border-radius: 4px;
 }
 
-a#code-samples:hover {
+a#code-samples:hover,
+a#slideshow:hover,
+a#github:hover {
   color: #ffffff;
   background-color: #ff4010;
   cursor: pointer;
@@ -48,20 +75,22 @@ a#code-samples:hover {
 
 .queue-display {
   display: block;
-  font-family: sans-serif;
+  font-family: inherit;
   font-size: 10px;
   padding: 5px 10px;
   margin: 0 0 20px 0;
-  -moz-border-radius: 4px;
+  border-radius: 4px;
   background: #e8e8e8;
   position: relative;
+  box-shadow: 0 0 8px #505050;
 }
 
 .queue-toggle,
 .queue-slide {
   position: absolute;
-  top: 5px;
-  -moz-border-radius: 4px;
+  top: 8px;
+  border-radius: 4px;
+  border: 1px solid #c0c0c0;
   background: #ffffff;
   color: #606060;
   padding: 2px 6px;
@@ -134,7 +163,7 @@ a#code-samples:hover {
   padding: 3px 6px;
   background-color: #d0d0d0;
   margin: 0 6px 6px 0;
-  -moz-border-radius: 4px;
+  border-radius: 4px;
 }
 
 .request-display { 
@@ -144,7 +173,7 @@ a#code-samples:hover {
   font-size: 10px;
   padding: 5px 10px;
   margin: 0 10px 10px 0;
-  -moz-border-radius: 4px;
+  border-radius: 4px;
   border: 6px solid transparent;
   position: relative;
 }
@@ -176,7 +205,7 @@ a#code-samples:hover {
   color: #ffffff;
   padding: 0.2em 0.5em;
   margin-right: 0.5em;
-  -moz-border-radius: 4px;
+  border-radius: 4px;
 }
 
 .request-buttons {
@@ -189,7 +218,7 @@ a#code-samples:hover {
   display: inline-block;
   width: 0.8em;
   text-align: center;
-  -moz-border-radius: 4px;
+  border-radius: 4px;
   background: #f0f0f0;
   color: #606060;
   padding: 2px 4px;
