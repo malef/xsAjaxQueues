@@ -22,6 +22,7 @@
     <h1 id="header">xsAjaxQueues - jQuery AJAX queues and requests extension demo</h1>
     <div id="copyright">&copy; 2010 Mariusz Alef Bąk <a href="mailto:mariusz.bak@xsolve.pl">mariusz.bak(at)xsolve.pl</a> <a href="mailto:mariusz.alef.bak@gmail.com">mariusz.alef.bak(at)gmail.com</a></div>
     <div id="description">
+      <p><strong>XsAjaxQueues</strong> wraps default jQuery.ajax function so that requests can be grouped into various types of queues by simply adding some options. There are various types of queues available, for each request a wrapper is returned that allows request to be canceled or aborted or to add a new callback later on, even if responsed has already arrived.</p>
       <p><strong>FIFO_REQUEST queue</strong> - Requests added as first are sent as first. Next request is sent only if previous is complete (ends with an error or returns response.</p>
       <p><strong>LIFO_REQUEST queue</strong> - Requests added as last are sent as first. Next request is sent only if previous is complete (ends with an error or returns response.</p>
       <p><strong>LIFO_RESPONSE queue</strong> - Requests added as last are sent as first. Next request can be sent as soon as it is added, but response callbacks will not be executed before response from previous request is processed.</p>
