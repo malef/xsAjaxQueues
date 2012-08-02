@@ -320,39 +320,39 @@ jQuery((function($) {
       }
     });
 
-    $.ajaxQueue({id: 'intercepted_requests', priority: 'desc', mode: 'request', initializer: function() { alert(this.getId()); } }); //.disable();
-
-    $.ajaxFilter(function() {
-      return (this.queue === undefined);
-    }, function() {
-      this.queue = 'intercepted_requests';
-      if (this.data || this.data.sleep || this.data.sleep > 4) {
-        this.priority = 0;
-      }
-      else {
-        this.priority = 1;
-      }
-      return this;
-    },
-    function() {
-      this.addListener(function(event) {
-        $('body').append($('<p />').text('post ' + event + ' ' + this.getId()));
-      });
-    });
-
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}, listeners: [
-      function(event) {
-        $('body').append($('<p />').append($('<em />').text(event)));
-      }
-    ]});
-
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 6}});
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}});
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 2}});
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 1}});
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 1}});
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 9}});
-    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 3}});
+//    $.ajaxQueue({id: 'intercepted_requests', priority: 'desc', mode: 'request', initializer: function() { alert(this.getId()); } }); //.disable();
+//
+//    $.ajaxFilter(function() {
+//      return (this.queue === undefined);
+//    }, function() {
+//      this.queue = 'intercepted_requests';
+//      if (this.data || this.data.sleep || this.data.sleep > 4) {
+//        this.priority = 0;
+//      }
+//      else {
+//        this.priority = 1;
+//      }
+//      return this;
+//    },
+//    function() {
+//      this.addListener(function(event) {
+//        $('body').append($('<p />').text('post ' + event + ' ' + this.getId()));
+//      });
+//    });
+//
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}, listeners: [
+//      function(event) {
+//        $('body').append($('<p />').append($('<em />').text(event)));
+//      }
+//    ]});
+//
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 6}});
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 5}});
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 2}});
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 1}});
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 1}});
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 9}});
+//    $.ajax({type: "POST", url: "sleep.php", data: {sleep: 3}});
 
   };
 
